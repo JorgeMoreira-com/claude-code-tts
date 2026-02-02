@@ -1,0 +1,12 @@
+{
+  "name": "claude-code-tts",
+  "version": "1.0.0",
+  "description": "Text-to-speech for Claude Code - high quality, low cost",
+  "author": {
+    "name": "Jorge Moreira",
+    "url": "https://github.com/JorgeMoreira-com"
+  },
+  "repository": "https://github.com/JorgeMoreira-com/claude-code-tts",
+  "license": "MIT",
+  "keywords": ["tts", "text-to-speech", "voice", "audio", "claude-code"]
+}

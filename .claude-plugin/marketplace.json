@@ -1,0 +1,15 @@
+{
+  "name": "claude-code-tts",
+  "description": "Text-to-speech plugin for Claude Code",
+  "owner": {
+    "name": "Jorge Moreira",
+    "url": "https://github.com/JorgeMoreira-com"
+  },
+  "plugins": [
+    {
+      "name": "claude-code-tts",
+      "description": "Text-to-speech for Claude Code - high quality, low cost",
+      "source": "./"
+    }
+  ]
+}
