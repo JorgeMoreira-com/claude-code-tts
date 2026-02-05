@@ -22,6 +22,6 @@ description: Text-to-speech protocol for Claude Code
 - Keep messages under 150 characters
 - Always announce errors
 
-**Voices:** hannah (default), autumn, diana, austin, daniel, troy
+**Voices:** Luna (default), Dennis, Timothy, Ronald, Wendy (Inworld) | hannah, autumn, diana, austin, daniel, troy (Groq)
 
 **Mute:** Create `.tts-muted` file in project root to silence TTS

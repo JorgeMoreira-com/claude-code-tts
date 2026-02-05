@@ -11,9 +11,13 @@
 CONFIG_FILE="$HOME/.config/claude-code-tts/.env"
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$0")")}"
 
-if [[ -f "$CONFIG_FILE" ]] && grep -q 'GROQ_API_KEY=.' "$CONFIG_FILE"; then
+# Check for either provider's API key
+HAS_GROQ=$(grep -q 'GROQ_API_KEY=.' "$CONFIG_FILE" 2>/dev/null && echo "yes")
+HAS_INWORLD=$(grep -q 'INWORLD_API_KEY=.' "$CONFIG_FILE" 2>/dev/null && echo "yes")
+
+if [[ -f "$CONFIG_FILE" ]] && [[ "$HAS_GROQ" == "yes" || "$HAS_INWORLD" == "yes" ]]; then
   # Substitute ${CLAUDE_PLUGIN_ROOT} with actual path so Claude can use it
   sed "s|\${CLAUDE_PLUGIN_ROOT}|$PLUGIN_ROOT|g" "$PLUGIN_ROOT/skills/tts/SKILL.md"
 else
-  echo "⚠️ TTS NOT CONFIGURED - Run /claude-code-tts:setup to configure your Groq API key"
+  echo "⚠️ TTS NOT CONFIGURED - Run /claude-code-tts:setup to configure your TTS provider"
 fi
