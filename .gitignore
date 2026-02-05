@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Lockfiles
+bun.lock
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Ultracite / Biome (local only)
+biome.jsonc
+biome.json
+package.json
+.vscode/
+
+# TTS temp files
+*.wav
+*.mp3
+
+# Mute files
+.tts-muted
+
+# OS files
+.DS_Store
+Thumbs.db
