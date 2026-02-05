@@ -57,8 +57,17 @@ if [[ "$HTTP" != "200" ]]; then
 fi
 
 # Play audio and delete file after playback completes
+# Uses locking to queue audio - prevents overlapping TTS messages
 # Runs in background subshell so script can return immediately
+LOCK_FILE="/tmp/claude-tts.lock"
 (
+  # Cross-platform lock acquisition
+  # Wait for any existing lock to be released (another audio playing)
+  while ! mkdir "$LOCK_FILE.d" 2>/dev/null; do
+    sleep 0.1
+  done
+
+  # Play audio
   if [[ "$(uname -s)" == "Darwin" ]]; then
     afplay "$OUTPUT" 2>/dev/null
   elif command -v paplay &>/dev/null; then
@@ -66,6 +75,9 @@ fi
   elif command -v aplay &>/dev/null; then
     aplay "$OUTPUT" 2>/dev/null
   fi
+
+  # Release lock and cleanup
+  rmdir "$LOCK_FILE.d" 2>/dev/null
   rm -f "$OUTPUT"
 ) &
 

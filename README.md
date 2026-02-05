@@ -123,15 +123,18 @@ export GROQ_API_KEY='your-api-key-here'
 
 The plugin uses hooks to automatically trigger TTS at key moments:
 
-- **SessionStart** - Announces when a new session begins
-- **Stop** - Speaks a summary when Claude finishes a task
-- **Notification** - Alerts you when background tasks complete
+| Hook | Trigger | Example |
+|------|---------|---------|
+| **SessionStart** | New session begins | "TTS ready" |
+| **Stop** | Claude finishes responding | Summarizes the response |
+| **Notification** | Background task alert | "Task complete" |
+| **SubagentStop** | Spawned agent finishes | "Research agent completed" |
+| **PreToolUse** | Before running commands | "Installing dependencies" |
+| **PostToolUse** | After commands complete | "Build succeeded" or "Tests failed" |
 
-When using the `/claude-code-tts:tts` skill, Claude will also speak during tasks:
+The PreToolUse and PostToolUse hooks recognize common commands like git, npm, pytest, docker, cargo, and go, announcing them in natural language.
 
-1. **Start** - Announces what it's about to do
-2. **Progress** - Updates during file edits/reads
-3. **End** - Summarizes the result
+When using the `/claude-code-tts:tts` skill, Claude will also speak during tasks as it works.
 
 ## Smart Summarization
 
@@ -219,16 +222,30 @@ claude-code-tts/
 │   ├── session-start.sh         # SessionStart hook handler
 │   ├── stop-hook.sh             # Stop hook handler
 │   ├── notification-hook.sh     # Notification hook handler
+│   ├── subagent-stop-hook.sh    # SubagentStop hook handler
+│   ├── pre-tool-use-hook.sh     # PreToolUse hook handler
+│   ├── post-tool-use-hook.sh    # PostToolUse hook handler
 │   └── stop.sh                  # Kill audio playback
 ├── README.md
 └── LICENSE
 ```
 
+## Platform Support
+
+| Platform | Status | Audio Player |
+|----------|--------|--------------|
+| **macOS** | Fully supported | `afplay` (built-in) |
+| **Linux** | Fully supported | `paplay` (PulseAudio) or `aplay` (ALSA) |
+| **WSL** | Supported | Requires PulseAudio or ALSA configured |
+| **Windows** | Not supported | No native bash support |
+
+The plugin uses cross-platform locking (`mkdir` atomic operation) to queue audio playback, preventing overlapping TTS messages on all supported platforms.
+
 ## Requirements
 
 - [Claude Code CLI](https://claude.ai/code)
 - `curl` (pre-installed on most systems)
-- `jq` (for Inworld provider)
+- `jq` (for Inworld provider, install via `brew install jq` or `apt install jq`)
 - Audio player: `afplay` (macOS), `paplay` (Linux/PulseAudio), or `aplay` (Linux/ALSA)
 
 ## Troubleshooting
