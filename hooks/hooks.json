@@ -1,4 +1,5 @@
 {
+  "description": "Text-to-speech announcements for Claude Code sessions",
   "hooks": {
     "SessionStart": [
       {

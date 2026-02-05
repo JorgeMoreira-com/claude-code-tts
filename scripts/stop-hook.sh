@@ -24,9 +24,8 @@ HOOK_INPUT=$(cat)
 # Extract transcript path from hook input
 TRANSCRIPT_PATH=$(echo "$HOOK_INPUT" | jq -r '.transcript_path // empty')
 
-# If no transcript or file doesn't exist, approve and exit
+# If no transcript or file doesn't exist, allow and exit
 if [[ -z "$TRANSCRIPT_PATH" || ! -f "$TRANSCRIPT_PATH" ]]; then
-  echo '{"decision":"approve"}'
   exit 0
 fi
 
@@ -35,7 +34,6 @@ fi
 LAST_ASSISTANT=$(grep '"role":"assistant"' "$TRANSCRIPT_PATH" | tail -1)
 
 if [[ -z "$LAST_ASSISTANT" ]]; then
-  echo '{"decision":"approve"}'
   exit 0
 fi
 
@@ -50,7 +48,6 @@ FINAL_TEXT=$(echo "$LAST_ASSISTANT" | jq -r '
 
 # Skip if no text content
 if [[ -z "$FINAL_TEXT" || "$FINAL_TEXT" == "null" ]]; then
-  echo '{"decision":"approve"}'
   exit 0
 fi
 
@@ -79,4 +76,4 @@ if [[ -n "$SUMMARY" && ${#SUMMARY} -gt 5 ]]; then
   "$SCRIPT_DIR/play-tts.sh" "$SUMMARY" &
 fi
 
-echo '{"decision":"approve"}'
+exit 0

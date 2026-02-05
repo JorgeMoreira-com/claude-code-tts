@@ -3,25 +3,42 @@
 # SubagentStop hook for Claude Code TTS
 # Announces when a spawned subagent completes its task
 #
+# SubagentStop input fields (per official docs):
+#   - agent_id: unique identifier for the subagent
+#   - agent_type: type name (Bash, Explore, Plan, or custom agent names)
+#   - agent_transcript_path: path to subagent's transcript
+#   - stop_hook_active: whether stop hook is already active
+#
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Read hook input from stdin
 HOOK_INPUT=$(cat)
 
-# Extract the task description from the subagent
-DESCRIPTION=$(echo "$HOOK_INPUT" | jq -r '.tool_input.description // .tool_input.prompt // "a task" | .[0:100]' 2>/dev/null)
+# Extract the agent type from the SubagentStop input
+AGENT_TYPE=$(echo "$HOOK_INPUT" | jq -r '.agent_type // empty' 2>/dev/null)
 
-# Clean up description for speech
-if [[ -n "$DESCRIPTION" && "$DESCRIPTION" != "null" ]]; then
-  # Truncate and clean for TTS
-  DESCRIPTION=$(echo "$DESCRIPTION" | tr '\n' ' ' | sed 's/  */ /g' | head -c 80)
-  MESSAGE="Subagent finished: $DESCRIPTION"
-else
-  MESSAGE="A background agent has completed its task."
-fi
+# Create a friendly message based on agent type
+case "$AGENT_TYPE" in
+  Bash)
+    MESSAGE="Background shell task completed"
+    ;;
+  Explore)
+    MESSAGE="Exploration agent finished"
+    ;;
+  Plan)
+    MESSAGE="Planning agent completed"
+    ;;
+  "")
+    MESSAGE="A background agent has completed"
+    ;;
+  *)
+    # Custom agent name - use it directly
+    MESSAGE="$AGENT_TYPE agent completed"
+    ;;
+esac
 
 # Speak the announcement
 "$SCRIPT_DIR/play-tts.sh" "$MESSAGE" &
 
-echo '{"decision":"approve"}'
+exit 0

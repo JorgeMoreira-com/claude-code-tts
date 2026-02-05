@@ -14,7 +14,6 @@ TOOL_NAME=$(echo "$HOOK_INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 
 # Only announce for Bash commands
 if [[ "$TOOL_NAME" != "Bash" ]]; then
-  echo '{"decision":"approve"}'
   exit 0
 fi
 
@@ -22,7 +21,6 @@ fi
 COMMAND=$(echo "$HOOK_INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
 
 if [[ -z "$COMMAND" ]]; then
-  echo '{"decision":"approve"}'
   exit 0
 fi
 
@@ -123,7 +121,6 @@ case "$BASE_CMD" in
     ;;
   *)
     # Skip other commands to avoid noise
-    echo '{"decision":"approve"}'
     exit 0
     ;;
 esac
@@ -131,4 +128,4 @@ esac
 # Speak the announcement
 "$SCRIPT_DIR/play-tts.sh" "$MESSAGE" &
 
-echo '{"decision":"approve"}'
+exit 0
