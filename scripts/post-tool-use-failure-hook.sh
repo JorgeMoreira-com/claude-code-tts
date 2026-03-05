@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# PostToolUse hook for Claude Code TTS
-# Announces when certain tools complete (especially Bash commands)
+# PostToolUseFailure hook for Claude Code TTS
+# Announces when Bash commands fail
 #
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,25 +13,23 @@ HOOK_INPUT=$(cat)
 # Extract tool name
 TOOL_NAME=$(echo "$HOOK_INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 
-# Only announce for Bash commands
-if [[ "$TOOL_NAME" != "Bash" ]]; then
+if ! tool_is_bash "$TOOL_NAME"; then
   exit 0
 fi
 
-# Get the command that was run
+# Get the command that failed
 COMMAND=$(echo "$HOOK_INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
 
-if [[ -z "$COMMAND" ]]; then
-  exit 0
+if [[ -z "$COMMAND" || "$COMMAND" == "null" ]]; then
+  COMMAND="command"
 fi
 
-MESSAGE="$(post_tool_success_message "$COMMAND")"
+MESSAGE="$(post_tool_failure_message "$COMMAND")"
 
 if [[ -z "$MESSAGE" ]]; then
   exit 0
 fi
 
-# Speak the announcement
 "$SCRIPT_DIR/play-tts.sh" "$MESSAGE" &
 
 exit 0

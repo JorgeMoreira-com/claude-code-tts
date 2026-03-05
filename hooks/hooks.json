@@ -26,7 +26,17 @@
     ],
     "Notification": [
       {
-        "matcher": "*",
+        "matcher": "permission",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/notification-hook.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "idle",
         "hooks": [
           {
             "type": "command",
@@ -67,6 +77,18 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/scripts/post-tool-use-hook.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/post-tool-use-failure-hook.sh",
             "timeout": 5
           }
         ]

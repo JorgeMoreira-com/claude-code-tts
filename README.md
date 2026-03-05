@@ -127,12 +127,13 @@ The plugin uses hooks to automatically trigger TTS at key moments:
 |------|---------|---------|
 | **SessionStart** | New session begins | "TTS ready" |
 | **Stop** | Claude finishes responding | Summarizes the response |
-| **Notification** | Background task alert | "Task complete" |
-| **SubagentStop** | Spawned agent finishes | "Research agent completed" |
+| **Notification** | Permission or idle alerts | "Permission needed" |
+| **SubagentStop** | Spawned agent finishes | "Research agent completed. Found 3 issues." |
 | **PreToolUse** | Before running commands | "Installing dependencies" |
-| **PostToolUse** | After commands complete | "Build succeeded" or "Tests failed" |
+| **PostToolUse** | After successful commands | "Build succeeded" |
+| **PostToolUseFailure** | After failed commands | "Tests failed" |
 
-The PreToolUse and PostToolUse hooks recognize common commands like git, npm, pytest, docker, cargo, and go, announcing them in natural language.
+The tool hooks recognize common commands like git, npm, pytest, docker, cargo, and go, announcing them in natural language with configurable verbosity.
 
 When using the `/claude-code-tts:tts` skill, Claude will also speak during tasks as it works.
 
@@ -158,8 +159,18 @@ TTS_SUMMARIZE=false     # Use simple first-sentence extraction
 ### Customize Summary Length
 
 ```bash
-TTS_SUMMARY_WORDS=20    # Max words in summary (default: 15)
+TTS_SUMMARY_WORDS=20    # Max words in summary (default: 25)
 ```
+
+### Reduce Hook Chatter
+
+```bash
+TTS_VERBOSITY=normal    # quiet, normal (default), verbose
+```
+
+- `quiet`: speaks final responses and failures, minimizes intermediate announcements
+- `normal`: balanced start/stop and major tool announcements
+- `verbose`: also announces generic shell activity and richer idle details
 
 ### Example
 
@@ -169,7 +180,7 @@ TTS_SUMMARY_WORDS=20    # Max words in summary (default: 15)
 **With summarization enabled:**
 > "Found three JWT security vulnerabilities in the authentication module."
 
-**Without summarization (default):**
+**Without summarization:**
 > "I've analyzed the authentication module and identified three potential security vulnerabilities in the JWT validation logic."
 
 ## Mute/Unmute
@@ -225,6 +236,8 @@ claude-code-tts/
 │   ├── subagent-stop-hook.sh    # SubagentStop hook handler
 │   ├── pre-tool-use-hook.sh     # PreToolUse hook handler
 │   ├── post-tool-use-hook.sh    # PostToolUse hook handler
+│   ├── post-tool-use-failure-hook.sh # PostToolUseFailure hook handler
+│   ├── tool-announcements.sh    # Shared tool announcement logic
 │   └── stop.sh                  # Kill audio playback
 ├── README.md
 └── LICENSE
@@ -245,7 +258,7 @@ The plugin uses cross-platform locking (`mkdir` atomic operation) to queue audio
 
 - [Claude Code CLI](https://claude.ai/code)
 - `curl` (pre-installed on most systems)
-- `jq` (for Inworld provider, install via `brew install jq` or `apt install jq`)
+- `jq` (required for hook parsing and Inworld provider, install via `brew install jq` or `apt install jq`)
 - Audio player: `afplay` (macOS), `paplay` (Linux/PulseAudio), or `aplay` (Linux/ALSA)
 
 ## Troubleshooting

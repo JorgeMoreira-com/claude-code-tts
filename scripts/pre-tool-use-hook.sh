@@ -5,6 +5,7 @@
 #
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/tool-announcements.sh"
 
 # Read hook input from stdin
 HOOK_INPUT=$(cat)
@@ -24,66 +25,11 @@ if [[ -z "$COMMAND" ]]; then
   exit 0
 fi
 
-# Parse the command to create a friendly description
-# Extract the base command (first word or known command pattern)
-BASE_CMD=$(echo "$COMMAND" | awk '{print $1}')
+MESSAGE="$(pre_tool_message "$COMMAND")"
 
-case "$BASE_CMD" in
-  git)
-    SUBCMD=$(echo "$COMMAND" | awk '{print $2}')
-    case "$SUBCMD" in
-      push)   MESSAGE="Pushing to remote repository" ;;
-      pull)   MESSAGE="Pulling from remote repository" ;;
-      commit) MESSAGE="Creating a git commit" ;;
-      clone)  MESSAGE="Cloning a repository" ;;
-      checkout) MESSAGE="Switching branches" ;;
-      merge)  MESSAGE="Merging branches" ;;
-      rebase) MESSAGE="Rebasing commits" ;;
-      *)      MESSAGE="Running git $SUBCMD" ;;
-    esac
-    ;;
-  npm|yarn|pnpm)
-    SUBCMD=$(echo "$COMMAND" | awk '{print $2}')
-    case "$SUBCMD" in
-      install|i) MESSAGE="Installing dependencies" ;;
-      run)       MESSAGE="Running npm script" ;;
-      test)      MESSAGE="Running tests" ;;
-      build)     MESSAGE="Building the project" ;;
-      *)         MESSAGE="Running $BASE_CMD $SUBCMD" ;;
-    esac
-    ;;
-  docker)
-    SUBCMD=$(echo "$COMMAND" | awk '{print $2}')
-    MESSAGE="Running docker $SUBCMD"
-    ;;
-  pytest|jest|mocha|vitest)
-    MESSAGE="Running tests"
-    ;;
-  make)
-    MESSAGE="Running make build"
-    ;;
-  cargo)
-    SUBCMD=$(echo "$COMMAND" | awk '{print $2}')
-    MESSAGE="Running cargo $SUBCMD"
-    ;;
-  go)
-    SUBCMD=$(echo "$COMMAND" | awk '{print $2}')
-    MESSAGE="Running go $SUBCMD"
-    ;;
-  python|python3)
-    MESSAGE="Running Python script"
-    ;;
-  node)
-    MESSAGE="Running Node script"
-    ;;
-  curl|wget)
-    MESSAGE="Fetching from URL"
-    ;;
-  *)
-    # For other commands, just skip to avoid noise
-    exit 0
-    ;;
-esac
+if [[ -z "$MESSAGE" ]]; then
+  exit 0
+fi
 
 # Speak the announcement
 "$SCRIPT_DIR/play-tts.sh" "$MESSAGE" &

@@ -21,30 +21,54 @@ CONFIG_FILE="$HOME/.config/claude-code-tts/.env"
 # Read hook input from stdin
 HOOK_INPUT=$(cat)
 
-# Extract transcript path from hook input
-TRANSCRIPT_PATH=$(echo "$HOOK_INPUT" | jq -r '.transcript_path // empty')
+# Extract assistant message directly from hook input when available
+LAST_ASSISTANT_MESSAGE=$(echo "$HOOK_INPUT" | jq -c '.last_assistant_message // empty' 2>/dev/null)
 
-# If no transcript or file doesn't exist, allow and exit
-if [[ -z "$TRANSCRIPT_PATH" || ! -f "$TRANSCRIPT_PATH" ]]; then
-  exit 0
+extract_text_from_message() {
+  local message_json="$1"
+  echo "$message_json" | jq -r '
+    if type == "string" then
+      .
+    elif type == "object" then
+      if has("content") then
+        (.content // []
+          | map(select(.type == "text") | .text)
+          | join(" "))
+      elif has("message") then
+        (.message.content // []
+          | map(select(.type == "text") | .text)
+          | join(" "))
+      else
+        empty
+      end
+    else
+      empty
+    end
+  ' 2>/dev/null
+}
+
+FINAL_TEXT=""
+
+if [[ -n "$LAST_ASSISTANT_MESSAGE" && "$LAST_ASSISTANT_MESSAGE" != "null" ]]; then
+  FINAL_TEXT="$(extract_text_from_message "$LAST_ASSISTANT_MESSAGE")"
 fi
 
-# Get the last assistant message from the transcript
-# The transcript is JSONL format with one message per line
-LAST_ASSISTANT=$(grep '"role":"assistant"' "$TRANSCRIPT_PATH" | tail -1)
+# Fallback to transcript parsing if payload message is missing
+if [[ -z "$FINAL_TEXT" || "$FINAL_TEXT" == "null" ]]; then
+  TRANSCRIPT_PATH=$(echo "$HOOK_INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
 
-if [[ -z "$LAST_ASSISTANT" ]]; then
-  exit 0
+  if [[ -z "$TRANSCRIPT_PATH" || ! -f "$TRANSCRIPT_PATH" ]]; then
+    exit 0
+  fi
+
+  LAST_ASSISTANT=$(jq -sc '
+    map(select(.role == "assistant" and .message != null)) | last // empty
+  ' "$TRANSCRIPT_PATH" 2>/dev/null)
+
+  if [[ -n "$LAST_ASSISTANT" && "$LAST_ASSISTANT" != "null" ]]; then
+    FINAL_TEXT="$(extract_text_from_message "$LAST_ASSISTANT")"
+  fi
 fi
-
-# Extract text content from the message
-# Assistant messages have content array with text blocks
-FINAL_TEXT=$(echo "$LAST_ASSISTANT" | jq -r '
-  .message.content // [] |
-  map(select(.type == "text")) |
-  map(.text) |
-  join(" ")
-' 2>/dev/null)
 
 # Skip if no text content
 if [[ -z "$FINAL_TEXT" || "$FINAL_TEXT" == "null" ]]; then
