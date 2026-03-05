@@ -5,38 +5,47 @@ description: Text-to-speech protocol for Claude Code
 
 # Claude Code TTS Protocol
 
-**Your responses are automatically spoken aloud via TTS.** A Stop hook reads your last message and speaks a summary after each response. You do NOT need to call any TTS scripts manually.
+**Your responses are automatically spoken aloud via TTS.** End every response with a TTS marker containing a spoken summary. The Stop hook extracts and speaks it.
 
-## How It Works
+## TTS Marker (Required)
 
-- After each of your responses, the Stop hook extracts your text and speaks it
-- No Bash commands, no background tasks, no manual TTS calls needed
-- Just write clear, concise responses and the hook handles the rest
+End every response with this HTML comment marker:
 
-## Writing for TTS
+```
+<!-- TTS: "Your spoken summary here" -->
+```
 
-Since your responses are spoken aloud, write them to sound natural:
+The marker is invisible to the user but the Stop hook extracts and speaks it instantly.
 
-### Style
-- **JARVIS-like status updates**: "I'm updating...", "I found...", "I've completed..."
-- **Action-focused**: Lead with what you're doing or what happened
-- **Natural speech**: No code symbols, markdown formatting, or technical syntax
-- **Concise**: Get to the point quickly — shorter responses sound better spoken
-
-### What to Include
-- What you're about to do at the start of a task
-- Key findings as you discover them
-- File names and function names when relevant
-- Errors and what you're doing about them
-- Final results when done
+### Rules
+- **Always include the marker** as the very last line of your response
+- Write 1-2 sentences of natural, flowing speech inside the quotes
+- No code symbols, backticks, markdown, bullet points, or technical syntax
+- Spell out acronyms: API becomes "A P I", JWT becomes "J W T"
+- First person JARVIS style: "I've completed...", "I found...", "I'm updating..."
+- Lead with the outcome, then key details
+- Mention specific file names, function names, or counts when relevant
 
 ### Examples
 
-**Good:** "I'm updating the authentication logic in auth.ts to fix the token expiration bug."
-**Bad:** "Editing `auth.ts` — changing line 42: `if (token.expired)` to `if (isExpired(token))`"
+Response about fixing a bug:
+```
+<!-- TTS: "I've fixed the token expiration bug in auth.ts by adding a proper null check on line 47." -->
+```
 
-**Good:** "Found 3 failing tests in the user service. Fixing the mock setup."
-**Bad:** "```test results: 3 failed, 12 passed```"
+Response with a table of results:
+```
+<!-- TTS: "All four tests passed. Streaming audio, smart interruption, status line, and the stop script are all working correctly." -->
+```
+
+Response about an error:
+```
+<!-- TTS: "The build failed due to a missing dependency. I'm installing lodash now and retrying." -->
+```
+
+### When to skip the marker
+- If your response is a single short sentence that's already TTS-friendly, the marker is optional
+- Never include a marker in tool-only responses (no visible text)
 
 ## Voices
 

@@ -152,16 +152,14 @@ scripts/stop.sh
 
 Show TTS state in the Claude Code status bar. Output format: `TTS: inworld/max/Luna` or `TTS: groq/hannah MUTED >>>`.
 
-Add to `~/.claude/settings.json`:
+Add to `~/.claude/settings.json` (uses version-resilient path that survives plugin updates):
 ```json
 {
-  "statusLine": "/path/to/scripts/tts-status.sh"
+  "statusLine": {
+    "type": "command",
+    "command": "bash -c '\"$(ls -td ~/.claude/plugins/cache/claude-code-tts/claude-code-tts/*/ 2>/dev/null | head -1)scripts/tts-status.sh\"'"
+  }
 }
-```
-
-Find the path in your plugin cache:
-```bash
-find ~/.claude/plugins/cache -name "tts-status.sh" -path "*/claude-code-tts/*" 2>/dev/null | head -1
 ```
 
 ## How It Works
@@ -185,27 +183,25 @@ When using the `/claude-code-tts:tts` skill, Claude will also speak during tasks
 
 ## Smart Summarization
 
-By default, TTS uses Claude CLI (Haiku model) to create intelligent summaries of Claude's responses. This provides much better quality than simple text extraction.
+The plugin uses a 3-tier strategy to produce clean spoken summaries:
 
 ### How It Works
 
-| Mode | Latency | Quality | Cost |
-|------|---------|---------|------|
-| `TTS_SUMMARIZE=true` (default) | ~3-5 sec | Smart summary | Uses your Claude subscription |
-| `TTS_SUMMARIZE=false` | Instant | First sentence only | Free |
+| Strategy | When | Latency | Quality |
+|----------|------|---------|---------|
+| **TTS Markers** (primary) | Claude includes `<!-- TTS: "..." -->` in response | Instant | Best — Claude writes the spoken version |
+| **Claude CLI** (fallback) | Marker missing, `TTS_SUMMARIZE=true` | ~3-5 sec | Good — Haiku summarizes |
+| **First sentence** (last resort) | Claude CLI fails or `TTS_SUMMARIZE=false` | Instant | Basic |
 
-### Disable Summarization (Optional)
+The TTS skill instructs Claude to include an invisible HTML comment marker at the end of each response with a natural, spoken summary. The Stop hook extracts this marker instantly — no API call, no markdown parsing, no tables or code leaking into speech.
 
-If you prefer instant responses without the summarization latency, add to `~/.config/claude-code-tts/.env`:
+When the marker is missing (e.g., Claude didn't follow instructions), the plugin falls back to Claude CLI summarization, then to first-sentence extraction.
 
-```bash
-TTS_SUMMARIZE=false     # Use simple first-sentence extraction
-```
-
-### Customize Summary Length
+### Configuration
 
 ```bash
-TTS_SUMMARY_WORDS=20    # Max words in summary (default: 25)
+TTS_SUMMARIZE=false     # Skip Claude CLI fallback, use first-sentence only
+TTS_SUMMARY_WORDS=20    # Max words for Claude CLI summaries (default: 25)
 ```
 
 ### Reduce Hook Chatter
@@ -220,14 +216,12 @@ TTS_VERBOSITY=normal    # quiet, normal (default), verbose
 
 ### Example
 
-**Claude's response:**
-> "I've analyzed the authentication module and identified three potential security vulnerabilities in the JWT validation logic. The token expiration check wasn't properly handling edge cases..."
+**Claude's response** (what you see):
+> I've analyzed the authentication module and found three security vulnerabilities...
+> | Issue | Severity | ... (table follows)
 
-**With summarization enabled:**
-> "Found three JWT security vulnerabilities in the authentication module."
-
-**Without summarization:**
-> "I've analyzed the authentication module and identified three potential security vulnerabilities in the JWT validation logic."
+**What TTS speaks** (from the invisible marker):
+> "Found three security vulnerabilities in the authentication module. The JWT validation has missing expiration checks."
 
 ## Mute/Unmute
 

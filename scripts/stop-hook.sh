@@ -75,20 +75,27 @@ if [[ -z "$FINAL_TEXT" || "$FINAL_TEXT" == "null" ]]; then
   exit 0
 fi
 
-# Summarize the text based on configuration
-# TTS_SUMMARIZE: "true"/"claude" (default) = use Claude CLI, "false" = simple extraction
-TTS_SUMMARY_WORDS="${TTS_SUMMARY_WORDS:-25}"
+# Strategy 1: Extract TTS marker from response (instant, zero latency)
+# Claude includes <!-- TTS: "spoken summary" --> when the TTS skill is active
+MARKER_TEXT=$(echo "$FINAL_TEXT" | sed -n 's/.*TTS: "\(.*\)" -->.*/\1/p' | head -1)
 
-if [[ "${TTS_SUMMARIZE:-true}" == "false" ]]; then
-  # Simple first-sentence extraction (instant, opt-in for lower latency)
-  SUMMARY=$(echo "$FINAL_TEXT" | sed 's/\. .*/\./' | head -c 300)
+if [[ -n "$MARKER_TEXT" ]]; then
+  SUMMARY="$MARKER_TEXT"
 else
-  # Use Claude CLI for intelligent summarization (default)
-  SUMMARY=$("$SCRIPT_DIR/summarize-with-claude.sh" "$FINAL_TEXT" "$TTS_SUMMARY_WORDS" 2>/dev/null)
+  # Strategy 2+3: Summarize the raw text (fallback when marker is missing)
+  TTS_SUMMARY_WORDS="${TTS_SUMMARY_WORDS:-25}"
 
-  # Fall back to simple extraction if Claude CLI fails
-  if [[ -z "$SUMMARY" ]]; then
+  if [[ "${TTS_SUMMARIZE:-true}" == "false" ]]; then
+    # Simple first-sentence extraction (instant, opt-in for lower latency)
     SUMMARY=$(echo "$FINAL_TEXT" | sed 's/\. .*/\./' | head -c 300)
+  else
+    # Use Claude CLI for intelligent summarization (default)
+    SUMMARY=$("$SCRIPT_DIR/summarize-with-claude.sh" "$FINAL_TEXT" "$TTS_SUMMARY_WORDS" 2>/dev/null)
+
+    # Fall back to simple extraction if Claude CLI fails
+    if [[ -z "$SUMMARY" ]]; then
+      SUMMARY=$(echo "$FINAL_TEXT" | sed 's/\. .*/\./' | head -c 300)
+    fi
   fi
 fi
 

@@ -223,21 +223,25 @@ If yes, explain:
 The status line shows provider, voice, mute state, and a playing indicator. To enable it, add a `statusLine` command to `~/.claude/settings.json`.
 
 **Standalone (no existing statusLine):**
-```bash
-# Find the tts-status.sh path in the plugin cache
-TTS_STATUS=$(find ~/.claude/plugins/cache -name "tts-status.sh" -path "*/claude-code-tts/*" 2>/dev/null | head -1)
-if [[ -n "$TTS_STATUS" ]]; then
-  echo "Add this to ~/.claude/settings.json:"
-  echo "  \"statusLine\": \"$TTS_STATUS\""
-else
-  echo "Plugin cache not found. Restart Claude Code, then re-run setup."
-fi
+
+Use a version-resilient path pattern so updates don't break it:
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bash -c '\"$(ls -td ~/.claude/plugins/cache/claude-code-tts/claude-code-tts/*/ 2>/dev/null | head -1)scripts/tts-status.sh\"'"
+  }
+}
 ```
 
 **Composing with an existing statusLine command:**
-```bash
-# If user already has a statusLine, compose them:
-# "statusLine": "echo \"$(existing-command) | $(tts-status.sh)\""
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bash -c 'echo \"$(existing-command) | $(ls -td ~/.claude/plugins/cache/claude-code-tts/claude-code-tts/*/ 2>/dev/null | head -1)scripts/tts-status.sh\"'"
+  }
+}
 ```
 
 ## Completion
