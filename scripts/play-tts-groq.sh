@@ -5,6 +5,9 @@
 # Cost: $22 per million characters
 #
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/audio-utils.sh"
+
 TEXT="$1"
 
 # Load config for default voice
@@ -36,49 +39,47 @@ if [[ -z "$GROQ_API_KEY" ]]; then
   exit 1
 fi
 
-# Use system temp directory (no persistence)
-# Note: macOS mktemp doesn't support suffixes after XXXXXX, so we use PID+RANDOM
-OUTPUT="/tmp/groq-tts-$$-$RANDOM.wav"
-
 # Escape text for JSON
 ESCAPED=$(printf '%s' "$TEXT" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\n' ' ')
 
-# Call Groq API
-HTTP=$(curl -s -w "%{http_code}" -o "$OUTPUT" \
-  -X POST "https://api.groq.com/openai/v1/audio/speech" \
-  -H "Authorization: Bearer $GROQ_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d "{\"model\":\"canopylabs/orpheus-v1-english\",\"voice\":\"$VOICE\",\"input\":\"$ESCAPED\",\"response_format\":\"wav\"}")
+# Detect player (may be pre-set by router)
+PLAYER="${TTS_DETECTED_PLAYER:-$(detect_player)}"
 
-if [[ "$HTTP" != "200" ]]; then
-  echo "Groq API error: HTTP $HTTP"
-  [[ -f "$OUTPUT" ]] && cat "$OUTPUT" && rm -f "$OUTPUT"
-  exit 2
-fi
-
-# Play audio and delete file after playback completes
-# Uses locking to queue audio - prevents overlapping TTS messages
-# Runs in background subshell so script can return immediately
-LOCK_FILE="/tmp/claude-tts.lock"
+# Play audio with lock + PID tracking, in background so script returns immediately
 (
-  # Cross-platform lock acquisition
-  # Wait for any existing lock to be released (another audio playing)
-  while ! mkdir "$LOCK_FILE.d" 2>/dev/null; do
-    sleep 0.1
-  done
+  acquire_lock
 
-  # Play audio
-  if [[ "$(uname -s)" == "Darwin" ]]; then
-    afplay "$OUTPUT" 2>/dev/null
-  elif command -v paplay &>/dev/null; then
-    paplay "$OUTPUT" 2>/dev/null
-  elif command -v aplay &>/dev/null; then
-    aplay "$OUTPUT" 2>/dev/null
+  if player_supports_stdin "$PLAYER"; then
+    # True streaming path: curl pipes directly to player (no temp file at all)
+    curl -s -X POST "https://api.groq.com/openai/v1/audio/speech" \
+      -H "Authorization: Bearer $GROQ_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d "{\"model\":\"canopylabs/orpheus-v1-english\",\"voice\":\"$VOICE\",\"input\":\"$ESCAPED\",\"response_format\":\"wav\"}" \
+      | play_audio_stdin "$PLAYER" &
+    write_pid $!
+    wait $!
+  else
+    # Fallback path: curl to temp file with HTTP error checking
+    OUTPUT="/tmp/groq-tts-$$-$RANDOM.wav"
+    HTTP=$(curl -s -w "%{http_code}" -o "$OUTPUT" \
+      -X POST "https://api.groq.com/openai/v1/audio/speech" \
+      -H "Authorization: Bearer $GROQ_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d "{\"model\":\"canopylabs/orpheus-v1-english\",\"voice\":\"$VOICE\",\"input\":\"$ESCAPED\",\"response_format\":\"wav\"}")
+
+    if [[ "$HTTP" != "200" ]]; then
+      echo "Groq API error: HTTP $HTTP" >&2
+      rm -f "$OUTPUT"
+    else
+      play_audio_file "$OUTPUT" "$PLAYER" &
+      write_pid $!
+      wait $!
+      rm -f "$OUTPUT"
+    fi
   fi
 
-  # Release lock and cleanup
-  rmdir "$LOCK_FILE.d" 2>/dev/null
-  rm -f "$OUTPUT"
-) &
+  clean_pid
+  release_lock
+) 2>/dev/null &
 
 echo "🎤 $VOICE"

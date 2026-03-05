@@ -5,8 +5,10 @@ Give your Claude Code AI assistant a voice with high-quality text-to-speech.
 ## Features
 
 - High-quality, human-like speech
+- **Streaming audio** — pipes directly to player with no temp files (ffplay/mpv)
+- **Smart interruption** — TTS stops instantly when you submit a new prompt
+- **Status line** — see TTS provider, voice, and playback state in the status bar
 - Multiple voice options per provider
-- Auto-cleanup of audio files
 - Works on macOS, Linux, and WSL
 - Choose between providers based on quality and cost
 
@@ -119,6 +121,49 @@ export GROQ_API_KEY='your-api-key-here'
 | `daniel` | Male |
 | `troy` | Male |
 
+## Streaming Audio
+
+When `ffplay` (from ffmpeg) or `mpv` is installed, audio is piped directly from the API to the player with no temporary files. This reduces latency and disk I/O.
+
+- **Groq**: `curl | ffplay` — true end-to-end streaming, audio starts before download completes
+- **Inworld**: base64 decode piped to ffplay — no temp file, but API response is still buffered (JSON format)
+- **Fallback**: if only `afplay`/`paplay`/`aplay` are available, temp files are used (same as before)
+
+Player detection order: `ffplay` > `mpv` > `afplay` > `paplay` > `aplay`. Override with `TTS_PLAYER` in config.
+
+```bash
+# Install ffplay (recommended)
+brew install ffmpeg    # macOS
+apt install ffmpeg     # Linux
+```
+
+## Smart Interruption
+
+TTS playback is automatically killed when you submit a new prompt. No more waiting for long audio to finish before Claude responds.
+
+The `UserPromptSubmit` hook sends SIGTERM to the active player process and releases the playback lock, so the next response can play immediately.
+
+You can also manually stop all audio:
+```bash
+scripts/stop.sh
+```
+
+## Status Line
+
+Show TTS state in the Claude Code status bar. Output format: `TTS: inworld/max/Luna` or `TTS: groq/hannah MUTED >>>`.
+
+Add to `~/.claude/settings.json`:
+```json
+{
+  "statusLine": "/path/to/scripts/tts-status.sh"
+}
+```
+
+Find the path in your plugin cache:
+```bash
+find ~/.claude/plugins/cache -name "tts-status.sh" -path "*/claude-code-tts/*" 2>/dev/null | head -1
+```
+
 ## How It Works
 
 The plugin uses hooks to automatically trigger TTS at key moments:
@@ -132,6 +177,7 @@ The plugin uses hooks to automatically trigger TTS at key moments:
 | **PreToolUse** | Before running commands | "Installing dependencies" |
 | **PostToolUse** | After successful commands | "Build succeeded" |
 | **PostToolUseFailure** | After failed commands | "Tests failed" |
+| **UserPromptSubmit** | User sends a new prompt | Kills active TTS playback |
 
 The tool hooks recognize common commands like git, npm, pytest, docker, cargo, and go, announcing them in natural language with configurable verbosity.
 
@@ -226,19 +272,22 @@ claude-code-tts/
 │   └── setup/
 │       └── SKILL.md         # Interactive setup wizard
 ├── scripts/
-│   ├── play-tts.sh              # Main TTS router
-│   ├── play-tts-groq.sh         # Groq provider script
-│   ├── play-tts-inworld.sh      # Inworld provider script
-│   ├── summarize-with-claude.sh # Claude CLI summarization
-│   ├── session-start.sh         # SessionStart hook handler
-│   ├── stop-hook.sh             # Stop hook handler
-│   ├── notification-hook.sh     # Notification hook handler
-│   ├── subagent-stop-hook.sh    # SubagentStop hook handler
-│   ├── pre-tool-use-hook.sh     # PreToolUse hook handler
-│   ├── post-tool-use-hook.sh    # PostToolUse hook handler
+│   ├── audio-utils.sh               # Shared audio utilities (player detection, streaming, locking)
+│   ├── play-tts.sh                  # Main TTS router
+│   ├── play-tts-groq.sh            # Groq provider script
+│   ├── play-tts-inworld.sh         # Inworld provider script
+│   ├── summarize-with-claude.sh    # Claude CLI summarization
+│   ├── session-start.sh            # SessionStart hook handler
+│   ├── stop-hook.sh                # Stop hook handler
+│   ├── notification-hook.sh        # Notification hook handler
+│   ├── subagent-stop-hook.sh       # SubagentStop hook handler
+│   ├── pre-tool-use-hook.sh        # PreToolUse hook handler
+│   ├── post-tool-use-hook.sh       # PostToolUse hook handler
 │   ├── post-tool-use-failure-hook.sh # PostToolUseFailure hook handler
-│   ├── tool-announcements.sh    # Shared tool announcement logic
-│   └── stop.sh                  # Kill audio playback
+│   ├── user-prompt-hook.sh         # UserPromptSubmit hook (kills TTS on new prompt)
+│   ├── tool-announcements.sh       # Shared tool announcement logic
+│   ├── tts-status.sh               # Status line output script
+│   └── stop.sh                     # Kill audio playback
 ├── README.md
 └── LICENSE
 ```
@@ -247,9 +296,9 @@ claude-code-tts/
 
 | Platform | Status | Audio Player |
 |----------|--------|--------------|
-| **macOS** | Fully supported | `afplay` (built-in) |
-| **Linux** | Fully supported | `paplay` (PulseAudio) or `aplay` (ALSA) |
-| **WSL** | Supported | Requires PulseAudio or ALSA configured |
+| **macOS** | Fully supported | `ffplay` (streaming) > `mpv` > `afplay` (built-in) |
+| **Linux** | Fully supported | `ffplay` > `mpv` > `paplay` > `aplay` |
+| **WSL** | Supported | Requires audio player configured |
 | **Windows** | Not supported | No native bash support |
 
 The plugin uses cross-platform locking (`mkdir` atomic operation) to queue audio playback, preventing overlapping TTS messages on all supported platforms.
@@ -259,7 +308,7 @@ The plugin uses cross-platform locking (`mkdir` atomic operation) to queue audio
 - [Claude Code CLI](https://claude.ai/code)
 - `curl` (pre-installed on most systems)
 - `jq` (required for hook parsing and Inworld provider, install via `brew install jq` or `apt install jq`)
-- Audio player: `afplay` (macOS), `paplay` (Linux/PulseAudio), or `aplay` (Linux/ALSA)
+- Audio player: `ffplay` (recommended, enables streaming) or `mpv`, `afplay` (macOS), `paplay`/`aplay` (Linux)
 
 ## Troubleshooting
 

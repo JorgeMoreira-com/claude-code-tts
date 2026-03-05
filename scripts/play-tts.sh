@@ -10,11 +10,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [[ -f ".tts-muted" ]] && exit 0
 [[ -f "$HOME/.tts-muted" ]] && exit 0
 
+# Load shared audio utilities and detect player
+source "$SCRIPT_DIR/audio-utils.sh"
+export TTS_DETECTED_PLAYER
+TTS_DETECTED_PLAYER="$(detect_player)"
+
 # Load config for provider selection
 CONFIG_FILE="$HOME/.config/claude-code-tts/.env"
 [[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE"
 
-# Route based on provider (audio files are auto-deleted after playback)
+# Route based on provider
 # Default: inworld (best quality at lowest price)
 case "${TTS_PROVIDER:-inworld}" in
   groq)

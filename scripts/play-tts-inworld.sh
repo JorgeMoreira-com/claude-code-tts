@@ -5,6 +5,9 @@
 # Cost: $10 per million characters (Max), $5 per million characters (Mini)
 #
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/audio-utils.sh"
+
 TEXT="$1"
 
 # Load config for default voice and model
@@ -41,9 +44,6 @@ if [[ -z "$INWORLD_API_KEY" ]]; then
   exit 1
 fi
 
-# Use system temp directory (no persistence)
-OUTPUT="/tmp/inworld-tts-$$-$RANDOM.mp3"
-
 # Escape text for JSON
 ESCAPED=$(printf '%s' "$TEXT" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\n' ' ')
 
@@ -61,32 +61,30 @@ if [[ -z "$AUDIO" ]]; then
   exit 2
 fi
 
-# Decode base64 audio to file
-echo "$AUDIO" | base64 -d > "$OUTPUT"
+# Detect player (may be pre-set by router)
+PLAYER="${TTS_DETECTED_PLAYER:-$(detect_player)}"
 
-# Play audio and delete file after playback completes
-# Uses locking to queue audio - prevents overlapping TTS messages
-# Runs in background subshell so script can return immediately
-LOCK_FILE="/tmp/claude-tts.lock"
+# Play audio with lock + PID tracking, in background so script returns immediately
 (
-  # Cross-platform lock acquisition
-  # Wait for any existing lock to be released (another audio playing)
-  while ! mkdir "$LOCK_FILE.d" 2>/dev/null; do
-    sleep 0.1
-  done
+  acquire_lock
 
-  # Play audio
-  if [[ "$(uname -s)" == "Darwin" ]]; then
-    afplay "$OUTPUT" 2>/dev/null
-  elif command -v paplay &>/dev/null; then
-    paplay "$OUTPUT" 2>/dev/null
-  elif command -v aplay &>/dev/null; then
-    aplay "$OUTPUT" 2>/dev/null
+  if player_supports_stdin "$PLAYER"; then
+    # Streaming path: pipe decoded audio directly to player (no temp file)
+    echo "$AUDIO" | base64 -d | play_audio_stdin "$PLAYER" &
+    write_pid $!
+    wait $!
+  else
+    # Fallback path: write temp file for players that don't support stdin
+    OUTPUT="/tmp/inworld-tts-$$-$RANDOM.mp3"
+    echo "$AUDIO" | base64 -d > "$OUTPUT"
+    play_audio_file "$OUTPUT" "$PLAYER" &
+    write_pid $!
+    wait $!
+    rm -f "$OUTPUT"
   fi
 
-  # Release lock and cleanup
-  rmdir "$LOCK_FILE.d" 2>/dev/null
-  rm -f "$OUTPUT"
-) &
+  clean_pid
+  release_lock
+) 2>/dev/null &
 
 echo "🎤 $VOICE"

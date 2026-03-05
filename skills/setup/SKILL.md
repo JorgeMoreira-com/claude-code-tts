@@ -214,6 +214,32 @@ If they choose a non-default voice:
 update_config_key "INWORLD_VOICE" "chosen_voice"
 ```
 
+## Step 4: Status Line (Optional)
+
+Ask if the user wants to see TTS status in the Claude Code status bar.
+
+If yes, explain:
+
+The status line shows provider, voice, mute state, and a playing indicator. To enable it, add a `statusLine` command to `~/.claude/settings.json`.
+
+**Standalone (no existing statusLine):**
+```bash
+# Find the tts-status.sh path in the plugin cache
+TTS_STATUS=$(find ~/.claude/plugins/cache -name "tts-status.sh" -path "*/claude-code-tts/*" 2>/dev/null | head -1)
+if [[ -n "$TTS_STATUS" ]]; then
+  echo "Add this to ~/.claude/settings.json:"
+  echo "  \"statusLine\": \"$TTS_STATUS\""
+else
+  echo "Plugin cache not found. Restart Claude Code, then re-run setup."
+fi
+```
+
+**Composing with an existing statusLine command:**
+```bash
+# If user already has a statusLine, compose them:
+# "statusLine": "echo \"$(existing-command) | $(tts-status.sh)\""
+```
+
 ## Completion
 
 Tell the user:
@@ -222,6 +248,7 @@ Tell the user:
 - Both provider keys are preserved, making it easy to switch
 - Restart Claude Code to activate the hooks
 - They can mute anytime with `touch .tts-muted`
+- TTS playback is automatically interrupted when they submit a new prompt
 
 Show their final configuration (masking API keys):
 ```bash
